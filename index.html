@@ -1,0 +1,1075 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#070707">
+  <meta name="description" content="ISB7 CORE — access terminal">
+  <title>ISB7 CORE</title>
+  <style>
+:root {
+  color-scheme: dark;
+  --bg: #070707;
+  --panel: #09090b;
+  --text: #f4f4f5;
+  --muted: #a1a1aa;
+  --dim: #82828b;
+  --line: #27272a;
+  --red: #ef4444;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family: Arial, Helvetica, sans-serif;
+}
+*, *::after, *::before { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--text); }
+.shell {
+  width: min(100%, 78rem);
+  min-height: 100vh;
+  min-height: 100svh;
+  margin: auto;
+  padding: max(22px, env(safe-area-inset-top)) max(clamp(14px, 4vw, 46px), env(safe-area-inset-right)) max(19px, env(safe-area-inset-bottom)) max(clamp(14px, 4vw, 46px), env(safe-area-inset-left));
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: clamp(14px, 2.8vh, 29px);
+}
+.top, .telemetry, .metadata, .dev-tools {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.top, .telemetry, .metadata, .eyebrow, .readout, .logs, .access, .dev-tools {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.4;
+  letter-spacing: .16em;
+}
+.top { min-height: 46px; border-bottom: 1px solid var(--line); padding-bottom: 15px; color: var(--dim); }
+.signature, .link-state, .readout { display: flex; align-items: center; gap: 12px; }
+.signature { color: var(--text); font-weight: 700; letter-spacing: .23em; }
+.interface { position: absolute; left: 50%; transform: translateX(-50%); }
+.slash { color: var(--red); }
+.mark {
+  width: 20px;
+  height: 20px;
+  background: var(--red);
+  clip-path: polygon(0 0, 38% 0, 38% 37%, 64% 37%, 64% 0, 100% 0, 100% 21%, 75% 21%, 75% 100%, 64% 100%, 64% 58%, 38% 58%, 38% 100%, 0 100%, 0 80%, 26% 80%, 26% 21%, 0 21%);
+}
+.lamp { flex: none; width: 5px; height: 5px; background: var(--red); }
+main {
+  --inset: clamp(13px, 2.45vw, 28px);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 560px;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.corners, .corners::after, .corners::before { pointer-events: none; position: absolute; z-index: 2; }
+.corners { inset: 0; }
+.corners::before, .corners::after {
+  content: "";
+  width: 17px;
+  height: 17px;
+  border-color: #a1a1aa;
+  border-style: solid;
+}
+.corners::before { inset: 0 auto auto 0; border-width: 1px 0 0 1px; }
+.corners::after { inset: auto 0 0 auto; border-width: 0 1px 1px 0; }
+.telemetry, .metadata { z-index: 1; padding: 0 var(--inset); min-height: 46px; color: var(--dim); font-size: 10px; }
+.telemetry { border-bottom: 1px solid var(--line); }
+.metadata { border-top: 1px solid var(--line); }
+.register { position: absolute; left: 50%; transform: translateX(-50%); color: var(--muted); }
+.scale { position: absolute; left: 50%; translate: -50%; width: 58px; height: 5px; opacity: .7; }
+.scale::before, .scale::after { content: ""; position: absolute; inset: 0 auto 0 0; width: 1px; background: var(--muted); }
+.scale::before { box-shadow: 7px 0 #52525b, 14px 0 #52525b, 21px 0 #52525b, 28px 0 var(--red), 35px 0 #52525b, 42px 0 #52525b, 49px 0 #52525b; }
+.scale::after { left: 56px; }
+.stage { position: relative; display: grid; align-items: center; padding: 58px 8%; min-width: 0; }
+.instrument { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+canvas { display: block; width: 100%; height: 100%; }
+.identity { position: relative; justify-self: start; }
+.eyebrow { color: var(--red); letter-spacing: .25em; margin: 0 0 18px; }
+h1 { font-size: clamp(84px, 15.2vw, 210px); line-height: .77; margin: 0 0 27px -.065em; font-weight: 800; letter-spacing: -.09em; }
+.readout { color: var(--muted); letter-spacing: .2em; }
+.readout .lamp { width: 4px; height: 4px; }
+.logs {
+  display: none;
+  position: absolute;
+  bottom: clamp(14px, 3vw, 32px);
+  left: var(--inset);
+  right: var(--inset);
+  gap: 10px;
+  grid-template-columns: minmax(0, 180px) minmax(16px, 136px) auto;
+  align-items: center;
+  justify-content: start;
+  color: var(--muted);
+  letter-spacing: .09em;
+  font-size: 10px;
+}
+.track { height: 2px; background: var(--line); }
+#progress { display: block; height: 100%; width: 0; background: var(--red); transition: width .22s ease; }
+#percentage { color: var(--red); }
+[data-phase="booting"] .logs { display: grid; }
+[data-phase="power"] .identity, [data-phase="booting"] .identity, [data-phase="booting"] .access { visibility: hidden; }
+[data-phase="ready"] .identity, [data-phase="ready"] .access { animation: reveal .44s ease-out both; }
+@keyframes reveal { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+[data-concept="b"] { background: #0b0b0d; }
+[data-concept="b"] .identity { z-index: 1; }
+[data-concept="b"] h1 { font-size: clamp(76px, 13vw, 164px); margin-bottom: 22px; }
+[data-concept="b"] .eyebrow { margin-bottom: 17px; }
+[data-concept="b"] .stage { padding-inline: clamp(20px, 6vw, 82px); }
+
+[data-concept="c"] .stage { grid-template-columns: minmax(0, 1fr) minmax(180px, 290px); gap: 10%; padding-inline: 9%; }
+[data-concept="c"] .identity { border-left: 2px solid var(--red); padding-left: clamp(16px, 3vw, 36px); }
+[data-concept="c"] h1 { font-size: clamp(76px, 13vw, 170px); }
+[data-concept="c"] .readout { color: var(--red); }
+.access { align-self: center; position: relative; color: var(--muted); background: #09090b; border: 1px solid var(--line); letter-spacing: .12em; text-transform: uppercase; }
+.access-title { color: var(--red); padding: 15px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+.access-title span { font-size: 17px; line-height: .7; }
+.access dl { margin: 0; padding: 3px 16px; }
+.access dl div { display: flex; justify-content: space-between; gap: 8px; padding: 11px 0; }
+.access dl div + div { border-top: 1px solid #202023; }
+.access dd { margin: 0; color: var(--text); text-align: right; }
+
+.dev-tools { min-height: 44px; color: var(--muted); font-size: 11px; letter-spacing: .05em; }
+.choices { display: flex; gap: 6px; }
+button {
+  min-height: 42px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font: inherit;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: border-color .15s, color .15s, background .15s;
+}
+button b { font-weight: 600; }
+button[aria-pressed="true"] { border-color: #482527; color: var(--text); background: #160c0d; }
+button[aria-pressed="true"] b, #replay span { color: var(--red); }
+#replay span { font-size: 17px; line-height: 1; }
+@media (hover: hover) { button:hover { color: var(--text); border-color: #71717a; } }
+button:focus-visible { outline: 1px solid var(--red); outline-offset: 3px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+@media (max-width: 720px) {
+  .interface { display: none; }
+  main { min-height: 490px; }
+  .stage { padding-inline: 7%; }
+  [data-concept="a"] .identity { align-self: end; }
+  [data-concept="a"] h1 { font-size: clamp(90px, 21vw, 145px); }
+  [data-concept="c"] .stage { grid-template-columns: 1fr; align-content: center; gap: 27px; padding-block: 43px; }
+  [data-concept="c"] .access { width: min(100%, 290px); }
+}
+@media (max-width: 450px) {
+  .top { min-height: 39px; padding-bottom: 11px; }
+  .telemetry, .metadata { min-height: 40px; font-size: 9px; letter-spacing: .11em; }
+  button { min-height: 44px; padding-inline: 8px; gap: 4px; }
+  .dev-tools { gap: 5px; font-size: 10px; }
+  .choices { gap: 4px; }
+}
+@media (max-width: 350px) { .choices button span { display: none; } }
+@media (max-height: 610px) and (orientation: landscape) {
+  main { min-height: 390px; }
+  .shell { gap: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+.boot-scene {
+  display: none;
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 8%;
+  transform: translateY(-50%);
+  max-width: 84%;
+  pointer-events: none;
+}
+[data-phase="booting"] .boot-scene { display: block; }
+.boot-scene[data-scene] { animation: scene-in .48s ease-out both; }
+@keyframes scene-in-alt {
+  from { opacity: 0; clip-path: inset(0 0 92% 0); }
+  to { opacity: 1; clip-path: inset(0); }
+}
+@keyframes scene-in {
+  from { opacity: 0; clip-path: inset(0 0 92% 0); }
+  to { opacity: 1; clip-path: inset(0); }
+}
+.boot-index, .boot-detail, .login-link, .login-dialog { font-family: var(--mono); }
+.boot-index { color: var(--red); font-size: 11px; letter-spacing: .2em; }
+.boot-title {
+  margin: 13px 0 11px;
+  font-size: clamp(29px, 5vw, 74px);
+  font-weight: 750;
+  line-height: .96;
+  letter-spacing: -.055em;
+  text-transform: uppercase;
+}
+.boot-detail { margin: 0; color: var(--muted); font-size: clamp(10px, 1.4vw, 12px); line-height: 1.65; letter-spacing: .08em; }
+[data-concept="b"] .boot-scene { left: clamp(20px, 6vw, 82px); max-width: 38%; }
+[data-concept="b"] .boot-title { font-size: clamp(29px, 4.6vw, 66px); }
+[data-concept="c"] .boot-scene { border-left: 2px solid var(--red); padding-left: 16px; }
+[data-concept="c"][data-step="4"] .boot-title { color: var(--red); }
+.logs { grid-template-columns: minmax(0, 180px) minmax(26px, 172px) 4ch; }
+#progress { transition: none; }
+.login-link { margin-top: 22px; letter-spacing: .11em; font-size: 10px; text-transform: uppercase; }
+.login-link span { color: var(--red); }
+[data-concept="b"] .login-link {
+  margin-top: 24px;
+  min-width: 188px;
+  justify-content: space-between;
+  background: #171012;
+  border-color: #573034;
+  border-left: 2px solid var(--red);
+  border-radius: 0;
+  color: var(--text);
+  padding-inline: 14px;
+}
+@media (hover: hover) {
+  [data-concept="b"] .login-link:hover { background: #261518; border-color: var(--red); }
+}
+[data-phase="booting"] .login-link { pointer-events: none; }
+.login-dialog {
+  width: min(390px, calc(100% - 32px));
+  border: 1px solid #52525b;
+  border-top: 2px solid var(--red);
+  padding: 22px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 11px;
+  letter-spacing: .12em;
+}
+.login-dialog::backdrop { background: rgb(0 0 0 / 79%); }
+.login-dialog h2 { font: 700 27px/1 Arial, Helvetica, sans-serif; letter-spacing: -.025em; }
+.login-dialog p { line-height: 1.65; }
+.login-dialog .dialog-status { min-height: 2em; color: var(--red); }
+.dialog-actions { display: flex; justify-content: space-between; gap: 10px; }
+@media (max-width: 720px) {
+  [data-concept="a"] .boot-scene, [data-concept="c"] .boot-scene { top: auto; bottom: 24%; transform: none; }
+  [data-concept="a"] .stage { padding-bottom: 36px; }
+}
+@media (max-width: 720px) {
+  [data-concept="b"] .stage { padding-block: 164px 22px; }
+  [data-concept="b"] .identity { align-self: end; }
+  [data-concept="b"] .boot-scene { top: auto; bottom: 19%; transform: none; max-width: calc(100% - 40px); }
+  [data-concept="b"] h1 { margin-bottom: 17px; }
+  [data-concept="b"] .login-link { margin-top: 14px; }
+}
+@media (max-width: 420px) {
+  [data-concept="c"] .stage { gap: 17px; padding-block: 24px; }
+  [data-concept="c"] .access dl div { padding-block: 8px; }
+}
+.power-sequence {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  place-items: center;
+  background: #030303;
+  pointer-events: none;
+}
+
+.power-display {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #0d0d10;
+  border-block: 1px solid #3a373a;
+  animation: screen-open 1.25s cubic-bezier(.16,.8,.24,1) both;
+}
+.power-beam {
+  position: absolute;
+  inset: 50% 5% auto;
+  height: 1px;
+  background: #d7cbcb;
+  animation: screen-beam 1.25s ease-out both;
+}
+@keyframes screen-open {
+  0%, 31% { clip-path: inset(50% 4%); }
+  52% { clip-path: inset(43% 3%); }
+  100% { clip-path: inset(0); }
+}
+@keyframes screen-beam {
+  0% { transform: scaleX(0); opacity: 0; }
+  12% { transform: scaleX(.05); opacity: .78; }
+  37% { transform: scaleX(1); opacity: .8; }
+  58%, 100% { transform: scaleX(1); opacity: 0; }
+}
+.power-check {
+  width: min(360px, calc(100% - 40px));
+  font: 11px/1.5 var(--mono);
+  color: var(--muted);
+  letter-spacing: .11em;
+  animation: power-check-in .36s 1.05s both;
+}
+.power-check .boot-index { color: var(--red); }
+.power-heading { margin: 8px 0 17px; color: var(--text); font: 750 clamp(27px, 5vw, 52px)/.98 Arial, Helvetica, sans-serif; letter-spacing: -.045em; }
+.power-check ul { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.power-check li {
+  display: flex;
+  justify-content: space-between;
+  min-height: 31px;
+  gap: 8px;
+  padding-block: 7px;
+  border-bottom: 1px solid var(--line);
+  animation: power-check-in .23s var(--check-delay) both;
+}
+.power-check li span:last-child { color: var(--text); text-align: right; }
+.power-check li:nth-child(1) { --check-delay: 1.58s; }
+.power-check li:nth-child(2) { --check-delay: 2.03s; }
+.power-check li:nth-child(3) { --check-delay: 2.48s; }
+.power-check li:nth-child(4) { --check-delay: 2.93s; }
+.power-check li:last-child span:last-child { color: var(--red); }
+@keyframes power-check-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+[data-phase="power"] .power-sequence { display: grid; animation: power-clear .42s 3.48s ease-in both; }
+@keyframes power-clear { to { opacity: 0; } }
+[data-concept="b"][data-phase="ready"] .identity { animation: operator-in .7s cubic-bezier(.18,.75,.2,1) both; }
+@keyframes operator-in {
+  from { opacity: 0; clip-path: inset(0 100% 0 0); transform: translateX(-9px); }
+  to { opacity: 1; clip-path: inset(0 -8px -8px -8px); transform: translateX(0); }
+}
+.core-trace {
+  position: absolute;
+  right: var(--inset);
+  bottom: clamp(14px, 3vw, 32px);
+  display: none;
+  width: min(48%, 24ch);
+  min-height: 4.65em;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: #a1a1aa;
+  font: 10px/1.55 var(--mono);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+[data-concept="b"][data-phase="booting"] .core-trace,
+[data-concept="b"][data-phase="ready"] .core-trace { display: block; }
+.core-trace li { min-height: 1.55em; overflow: hidden; white-space: pre; text-overflow: ellipsis; }
+.core-trace li:first-child { color: #777781; }
+.core-trace li:last-child { color: #c6c6ce; }
+@media (max-width: 720px) {
+  [data-concept="b"] .stage { padding-bottom: 65px; }
+  [data-concept="b"] .boot-scene { bottom: 28%; }
+  [data-concept="b"][data-phase="booting"] .core-trace { bottom: 37px; }
+  .core-trace { font-size: 9px; }
+}
+.production .shell { grid-template-rows: auto 1fr; }
+  </style>
+</head>
+<body class="production">
+  <div class="shell">
+    <header class="top">
+      <div class="signature"><span class="mark" aria-hidden="true"></span><span>ISB7 <span class="slash">/</span> CORE</span></div>
+      <span class="interface">SYSTEM INTERFACE</span>
+      <span class="link-state"><i class="lamp" aria-hidden="true"></i><span id="link-state">CORE STABLE</span></span>
+    </header>
+
+    <main id="terminal" data-concept="b" data-phase="ready" aria-labelledby="wordmark">
+      <span class="corners" aria-hidden="true"></span>
+      <div class="power-sequence" aria-hidden="true">
+        <div class="power-display">
+          <div class="power-check">
+            <span class="boot-index">ISB7 / BOOT ROM</span>
+            <p class="power-heading">SYSTEM START</p>
+            <ul>
+              <li><span>01 / POWER BUS</span><span>STABLE</span></li>
+              <li><span>02 / DISPLAY SYNC</span><span>LOCKED</span></li>
+              <li><span>03 / MEMORY BANK</span><span>VERIFIED</span></li>
+              <li><span>04 / CORE BUS</span><span>HANDOFF ↗</span></li>
+            </ul>
+          </div>
+        </div>
+        <div class="power-beam"></div>
+      </div>
+      <div class="telemetry">
+        <span id="channel">CH.02 <span class="slash">/</span> CORE</span>
+        <span class="register">+</span>
+        <span id="node">CORE 07</span>
+      </div>
+
+      <div class="stage">
+        <div class="instrument" aria-hidden="true">
+          <canvas id="diagram"></canvas>
+        </div>
+
+        <div class="identity">
+          <p class="eyebrow" id="mode">SYSTEM CORE</p>
+          <h1 id="wordmark">ISB7</h1>
+          <div class="readout" id="system-state">
+            <i class="lamp" aria-hidden="true"></i><span id="system-message">CORE SYNCHRONIZED</span>
+          </div>
+          <button class="login-link" id="login-open" type="button">Operator login <span aria-hidden="true">↗</span></button>
+        </div>
+
+        <div class="boot-scene" id="boot-scene" aria-hidden="true">
+          <span class="boot-index" id="boot-index"></span>
+          <p class="boot-title" id="boot-title"></p>
+          <p class="boot-detail" id="boot-detail"></p>
+        </div>
+
+        <div class="logs" aria-hidden="true">
+          <span id="log-message">INITIALIZING</span>
+          <div class="track"><span id="progress"></span></div>
+          <span id="percentage">00%</span>
+        </div>
+
+        <ol class="core-trace" aria-hidden="true">
+          <li id="trace-oldest"></li>
+          <li id="trace-previous"></li>
+          <li id="trace-latest">  core bus online</li>
+        </ol>
+
+        <div class="access" id="access" hidden>
+          <span class="access-title"><span aria-hidden="true">×</span> SESSION LOCKED</span>
+          <dl>
+            <div><dt>Clearance</dt><dd>Level 07</dd></div>
+            <div><dt>Session</dt><dd>Unverified</dd></div>
+            <div><dt>Port</dt><dd>Sealed</dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <div class="metadata">
+        <span id="code">SYS/07.CORE</span>
+        <span class="scale" aria-hidden="true"></span>
+        <span id="protocol">PROTOCOL 02</span>
+      </div>
+    </main>
+    <dialog class="login-dialog" id="login" aria-labelledby="login-title">
+      <p class="eyebrow">ISB7 / OPERATOR ACCESS</p>
+      <h2 id="login-title">Operator login</h2>
+      <p>LOCAL SIMULATION / OPERATOR–07</p>
+      <p class="dialog-status" id="login-status" role="status"></p>
+      <div class="dialog-actions">
+        <button type="button" id="login-close">Close</button>
+        <button type="button" id="login-verify">Verify operator</button>
+      </div>
+    </dialog>
+    <p class="sr-only" id="announcement" role="status"></p>
+
+    <footer class="dev-tools" aria-label="Ovládání prototypu" lang="cs" hidden>
+      <div class="choices" role="group" aria-label="Vizuální koncept">
+        <button type="button" data-select="a" aria-label="A – Terminál" aria-pressed="false"><b>A</b><span>Terminál</span></button>
+        <button type="button" data-select="b" aria-label="B – Jádro" aria-pressed="true"><b>B</b><span>Jádro</span></button>
+        <button type="button" data-select="c" aria-label="C – Přístup" aria-pressed="false"><b>C</b><span>Přístup</span></button>
+      </div>
+      <button type="button" id="replay"><span aria-hidden="true">↻</span> Znovu spustit</button>
+    </footer>
+  </div>
+  <script>
+"use strict";
+
+const concepts = {
+  a: {
+    channel: "COMMAND", node: "NODE 07", mode: "COMMAND TERMINAL",
+    state: "SYSTEM ONLINE", link: "LINK STABLE", code: "SYS/07.CMD",
+    boot: [
+      ["Cold start", "01 / AUXILIARY POWER", "POWER BUS"],
+      ["Signal sweep", "RX / SEARCHING LOCAL FREQUENCIES", "CARRIER SEARCH"],
+      ["Reconstruct", "SIG / COMMAND SEAL GEOMETRY", "SEAL RECONSTRUCTION"],
+      ["Command link", "07 / TERMINAL CARRIER ACQUIRED", "LINK HANDSHAKE"],
+      ["Control granted", "CMD / HANDING OFF TO OPERATOR", "HANDOFF"]
+    ]
+  },
+  b: {
+    channel: "CORE", node: "CORE 07", mode: "SYSTEM CORE",
+    state: "CORE SYNCHRONIZED", link: "CORE STABLE", code: "SYS/07.CORE",
+    boot: [
+      ["Core seed", "00 / REFERENCE POINT ACQUIRED", "CORE SEED"],
+      ["Acquire geometry", "03 / RECONSTRUCTING CORE SHELL", "MESH ACQUISITION"],
+      ["Align field", "∆ / SYNCHRONIZING ROTATIONAL AXES", "FIELD ALIGNMENT"],
+      ["Core lock", "00 / CONTAINMENT FIELD STABLE", "CORE LOCK"],
+      ["Core online", "07 / OPERATOR CHANNEL AVAILABLE", "OPERATOR CHANNEL"]
+    ]
+  },
+  c: {
+    channel: "RESTRICTED", node: "GATE 07", mode: "RESTRICTED TERMINAL",
+    state: "ACCESS DENIED", link: "LINK SEALED", code: "SYS/07.GATE",
+    boot: [
+      ["Gate 07", "RX / INBOUND SESSION DETECTED", "INBOUND SESSION"],
+      ["Challenge", "TX / CLEARANCE REQUEST ISSUED", "SECURITY HANDSHAKE"],
+      ["Clearance scan", "L07 / AWAITING OPERATOR RESPONSE", "CLEARANCE SCAN"],
+      ["Seal port", "04 / SESSION CHALLENGE EXPIRED", "PORT SEALED"],
+      ["Access denied", "ERR 07 / OPERATOR VERIFICATION REQUIRED", "SESSION REJECTED"]
+    ]
+  }
+};
+
+const byId = id => document.getElementById(id);
+const terminal = byId("terminal");
+const access = byId("access");
+const canvas = byId("diagram");
+const context = canvas.getContext("2d");
+const narrowScreen = matchMedia("(max-width: 720px)");
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+const controls = [...document.querySelectorAll("[data-select]")];
+const boundaries = [0, 1450, 3350, 5750, 8250, 10300];
+const duration = boundaries[boundaries.length - 1];
+const corePowerDuration = 3900;
+const coreBootTrace = [
+  ["corectl seed", "reference accepted"],
+  ["mesh load /core/07", "shell mapped"],
+  ["field align --phase", "axes synchronized"],
+  ["field lock --all", "containment stable"],
+  ["bus attach operator", "operator port ready"]
+];
+const coreRuntimeTrace = [
+  ["corectl phase", "lock within tolerance"],
+  ["bus ping node07", "reply from node07"],
+  ["thermal read shell", "shell temp nominal"],
+  ["mesh verify", "checksum OK"],
+  ["clock sync --local", "clock in sync"],
+  ["link poll operator", "awaiting operator"],
+  ["field sample", "drift < 0.02°"]
+];
+const traceRows = ["trace-oldest", "trace-previous", "trace-latest"].map(byId);
+const trace = { scene: -1, next: 0, pending: "", lastCheck: -1 };
+const bootScene = byId("boot-scene");
+const login = byId("login");
+
+
+let current = "b";
+let started = 0;
+let lastStep = -1;
+let lastPercent = -1;
+let frame = 0;
+let width = 0;
+let height = 0;
+const camera = { x: 0, y: 0, targetX: 0, targetY: 0 };
+const fullTurn = 2 * Math.PI;
+
+terminal.addEventListener("pointermove", event => {
+  if (event.pointerType !== "mouse" || current !== "b" || reduceMotion.matches) return;
+  const bounds = terminal.getBoundingClientRect();
+  camera.targetX = (event.clientX - bounds.left) / bounds.width - .5;
+  camera.targetY = (event.clientY - bounds.top) / bounds.height - .5;
+});
+terminal.addEventListener("pointerleave", () => {
+  camera.targetX = 0;
+  camera.targetY = 0;
+});
+
+function segment(x1, y1, x2, y2, color) {
+  context.strokeStyle = color;
+  context.beginPath();
+  context.moveTo(x1, y1);
+  context.lineTo(x2, y2);
+  context.stroke();
+}
+
+function arc(radius, from, to, color, weight = 1) {
+  context.beginPath();
+  context.strokeStyle = color;
+  context.lineWidth = weight;
+  context.arc(0, 0, radius, from, to);
+  context.stroke();
+  context.lineWidth = 1;
+}
+
+function route(points, color, fill) {
+  context.beginPath();
+  points.forEach(([x, y], index) => {
+    if (index === 0) context.moveTo(x, y);
+    else context.lineTo(x, y);
+  });
+  if (fill) {
+    context.fillStyle = fill;
+    context.fill();
+  }
+  context.strokeStyle = color;
+  context.stroke();
+}
+
+function grid() {
+  const step = current === "b" ? 37 : 40;
+  context.fillStyle = "#29292c";
+  for (let x = width / 2 % step; x < width; x += step) {
+    for (let y = height / 2 % step; y < height; y += step) {
+      context.fillRect(Math.round(x), Math.round(y), 1, 1);
+    }
+  }
+}
+
+function command(boot, scene, fraction) {
+  const narrow = narrowScreen.matches;
+  const radius = narrow ? Math.min(width * .265, height * .23) : Math.min(width * .172, height * .38);
+  context.translate(width * (narrow ? .5 : .742), height * (narrow ? .32 : .5));
+  context.scale(radius / 150, radius / 150);
+
+  segment(-169, 0, 169, 0, "#222226");
+  segment(0, -169, 0, 169, "#222226");
+  const sweep = boot ? (scene === 1 ? fraction : Math.min(1, (scene + fraction) / 2)) : 1;
+  arc(147, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * sweep, "#3b3b42");
+  if (boot && scene < 2) {
+    const angle = -Math.PI / 2 + Math.PI * 2 * sweep;
+    arc(147, angle - .23, angle, "#ef4444", 2);
+    segment(0, 0, Math.cos(angle) * 147, Math.sin(angle) * 147, "#763034");
+    return;
+  }
+  arc(131, 0, Math.PI * 2, "#26262a");
+  arc(147, Math.PI * 1.53, Math.PI * 1.78, "#9d3539", 2);
+  arc(147, Math.PI * .53, Math.PI * .78, "#515158", 2);
+  if (boot && scene >= 3) {
+    const lock = scene === 3 ? fraction : 1;
+    const corner = 117 + 29 * (1 - lock);
+    for (const direction of [-1, 1]) {
+      const x = corner * direction;
+      const y = corner * direction;
+      route([[x - direction * 22, y], [x, y], [x, y - direction * 22]], "#ab4043");
+    }
+    arc(158, Math.PI * 1.48, Math.PI * 1.48 + lock * .53, "#7c3438");
+  }
+
+  for (let i = 0; i < 48; i++) {
+    const angle = (i / 48) * Math.PI * 2;
+    const inner = i % 4 === 0 ? 133 : 139;
+    segment(Math.cos(angle) * inner, Math.sin(angle) * inner,
+      Math.cos(angle) * 143, Math.sin(angle) * 143, i % 4 === 0 ? "#55555d" : "#333338");
+  }
+
+  if (boot && scene === 2) {
+    const scan = -104 + 208 * fraction;
+    segment(-102, scan, 102, scan, "#9d3539");
+    context.beginPath();
+    context.rect(-108, -108, 216, scan + 108);
+    context.clip();
+  }
+  const edge = boot && scene < 3 ? "#38383d" : "#65656e";
+  route([[0, -92], [78, -48], [78, 44], [0, 91], [-78, 44], [-78, -48], [0, -92]],
+    "#37373d", "#101013");
+  route([[0, -64], [53, -34], [53, 27], [0, 61], [-53, 27], [-53, -34], [0, -64]], edge);
+  route([[-53, -34], [0, -4], [53, -34]], edge);
+  route([[-53, 27], [0, -4], [53, 27]], "#38383d");
+  segment(0, -4, 0, 61, edge);
+  route([[-28, -19], [0, -3], [28, -19]], "#a53439");
+  context.fillStyle = "#ef4444";
+  context.fillRect(-2, -6, 4, 4);
+}
+
+function clampUnit(value) {
+  return Math.max(0, Math.min(1, value));
+}
+
+function ease(value) {
+  const progress = clampUnit(value);
+  return progress * progress * (3 - 2 * progress);
+}
+
+function rotate([x, y, z], tilt, yaw, roll = 0) {
+  const pitch = y * Math.cos(tilt) - z * Math.sin(tilt);
+  const depth = y * Math.sin(tilt) + z * Math.cos(tilt);
+  const side = x * Math.cos(yaw) + depth * Math.sin(yaw);
+  return [
+    side * Math.cos(roll) - pitch * Math.sin(roll),
+    side * Math.sin(roll) + pitch * Math.cos(roll),
+    depth * Math.cos(yaw) - x * Math.sin(yaw)
+  ];
+}
+
+function spherical(latitude, longitude, radius) {
+  return [
+    radius * Math.cos(latitude) * Math.cos(longitude),
+    radius * Math.sin(latitude),
+    radius * Math.cos(latitude) * Math.sin(longitude)
+  ];
+}
+
+const shellPlates = [];
+for (let row = 0; row < 6; row++) {
+  const latitude = -.99 + row * .33;
+  for (let column = 0; column < 12; column++) {
+    if ((column + row * 2) % 11 < 2) continue;
+    const longitude = column * fullTurn / 12 + (row % 2) * .12;
+    shellPlates.push({
+      row, column,
+      points: [
+        [latitude, longitude + .045],
+        [latitude + .034, longitude + .47],
+        [latitude + .283, longitude + .43],
+        [latitude + .272, longitude + .085]
+      ]
+    });
+  }
+}
+
+function drawCoreShell(project, turn, tilt, assembly, locked) {
+  const faces = [];
+  for (const { row, column, points } of shellPlates) {
+    const settled = ease(assembly * 2 - (row * 12 + column) / 78);
+    if (settled <= .01) continue;
+    const radius = .66 + (1 - settled) * (.36 + row * .04);
+    const verts = points.map(([lat, lon]) => rotate(spherical(lat, lon, radius), tilt, turn + (1 - settled) * .4, -.19));
+    const depth = verts.reduce((sum, [, , z]) => sum + z, 0) / verts.length;
+    faces.push({ points: verts.map(project), depth, row, column });
+  }
+  faces.sort((a, b) => a.depth - b.depth);
+  const drawFace = ({ points, depth, row, column }) => {
+    const light = Math.round(20 + Math.max(0, depth) * 32 + (row + column * 2) % 8);
+    const accent = locked && (column + row * 3) % 17 === 1;
+    const [first, second, third, fourth] = points;
+    route([first, second, third, fourth, first], accent ? "#a6484d" : "#42434a",
+      accent ? "#331c20" : `rgb(${light} ${light + 1} ${light + 5})`);
+    if (depth > .04 && (column + row) % 3 === 0) {
+      route([first, third, fourth, first], "#34353b", accent ? "#66292f" : "rgba(123,127,141,.10)");
+    }
+  };
+
+  for (const face of faces) {
+    if (face.depth < 0) drawFace(face);
+  }
+
+  const aperture = .31 * Math.min(1, assembly * 1.8);
+  const center = project(rotate([0, 0, .13], tilt, -.08));
+  const rim = project(rotate([aperture, 0, .13], tilt, -.08));
+  const outerRadius = Math.hypot(rim[0] - center[0], rim[1] - center[1]);
+  context.save();
+  context.translate(...center);
+  context.fillStyle = "#201316";
+  context.beginPath();
+  context.arc(0, 0, outerRadius, 0, fullTurn);
+  context.fill();
+  arc(outerRadius, 0, fullTurn, "#5c343a");
+  for (let sector = 0; sector < 3; sector++) {
+    const angle = sector * fullTurn / 3 - turn * .28;
+    arc(outerRadius * .77, angle, angle + fullTurn / 3 - .27,
+      locked ? "#df6666" : "#8d454a", 2);
+  }
+  arc(outerRadius * .42, 0, fullTurn, locked ? "#a65155" : "#633239");
+  context.restore();
+
+  for (const face of faces) {
+    if (face.depth >= 0) drawFace(face);
+  }
+}
+
+function drawCoreOrbits(project, turn, tilt, assembly, lock) {
+  const bands = [
+    { radius: .93, tilt: 1.02, roll: -.38, yaw: .33, blocks: 10 },
+    { radius: 1.09, tilt: .30, roll: .57, yaw: 1.06, blocks: 8 },
+    { radius: 1.25, tilt: .48, roll: .08, yaw: -.17, blocks: 12 }
+  ];
+  bands.forEach((band, index) => {
+    const visible = ease(assembly * 1.65 - index * .26);
+    const point = (angle, distance) => project(rotate(
+      [Math.cos(angle) * distance, Math.sin(angle) * distance, 0],
+      band.tilt + tilt * .52, band.yaw, band.roll
+    ));
+    for (let block = 0; block < Math.ceil(band.blocks * visible); block++) {
+      const angle = block * fullTurn / band.blocks + turn * (index === 1 ? -.36 : .23);
+      const length = fullTurn / band.blocks * .77 * Math.min(1, band.blocks * visible - block);
+      const outer = [];
+      const inner = [];
+      for (let step = 0; step <= 6; step++) {
+        const theta = angle + length * step / 6;
+        outer.push(point(theta, band.radius));
+        inner.unshift(point(theta, band.radius - (index === 2 ? .021 : .043)));
+      }
+      const accent = lock && (block + index * 3) % 7 === 0;
+      route([...outer, ...inner, outer[0]], accent ? "#af4b51" : index === 2 ? "#3c3b43" : "#55545e",
+        accent ? "#623035" : "#19191e");
+      if (index === 2 && block % 2 === 0) {
+        route([point(angle, 1.27), point(angle, 1.31)], "#63616b");
+      }
+    }
+  });
+}
+
+function core(boot, elapsed, now, scene, fraction) {
+  const mobile = narrowScreen.matches;
+  const moving = !reduceMotion.matches;
+  const radius = mobile ? Math.min(width * .39, height * .30) : Math.min(width * .225, height * .40, 252);
+  const shift = moving && boot ? .82 + .18 * ease(elapsed / 8300) : 1;
+  const scale = radius * shift;
+  const centerX = width * (mobile ? .54 : .714);
+  const centerY = height * (mobile ? .29 : .485);
+  const time = (boot ? elapsed : duration) / 1000;
+  const drift = moving ? elapsedSinceBoot(now) / 1000 : 0;
+  camera.x += (camera.targetX - camera.x) * .07;
+  camera.y += (camera.targetY - camera.y) * .07;
+  const turn = moving ? time * .33 + drift * .125 + camera.x * .28 : 3.4;
+  const tilt = moving ? .30 + Math.sin((time + drift) * .32) * .11 + camera.y * .32 : .28;
+  const project = ([x, y, depth]) => {
+    const perspective = scale * 3.3 / (3.3 - depth);
+    return [x * perspective, y * perspective];
+  };
+
+  context.translate(centerX, centerY);
+  segment(-scale * 1.52, 0, scale * 1.46, 0, "#29292e");
+  segment(0, -scale * 1.37, 0, scale * 1.37, "#29292e");
+  arc(scale * 1.39, -.51, .21, "#39383e");
+  arc(scale * 1.39, Math.PI - .58, Math.PI + .31, "#39383e");
+
+  if (boot && scene === 0) {
+    const pulse = scale * (.045 + fraction * .51);
+    arc(pulse, 0, fullTurn, "#873b40");
+    segment(-9, 0, 9, 0, "#dc686c");
+    segment(0, -9, 0, 9, "#dc686c");
+    return;
+  }
+
+  const assembly = boot ? clampUnit((elapsed - 1450) / 3650) : 1;
+  const lock = !boot || scene >= 3;
+  drawCoreOrbits(project, turn, tilt, assembly, lock);
+  drawCoreShell(project, turn * .72, tilt, assembly, lock);
+
+  if (boot && scene === 2) {
+    const scan = -scale * .94 + fraction * scale * 1.88;
+    context.fillStyle = "rgba(239,68,68,.045)";
+    context.fillRect(-scale * .91, scan - 13, scale * 1.82, 13);
+    segment(-scale * .91, scan, scale * .91, scan, "#a4494e");
+  }
+  if (lock) {
+    const settle = boot && scene === 3 ? ease(fraction) : 1;
+    const bracket = scale * (1.10 + (1 - settle) * .17);
+    for (const sign of [-1, 1]) {
+      route([[sign * (bracket - 15), sign * bracket], [sign * bracket, sign * bracket],
+        [sign * bracket, sign * (bracket - 15)]], "#8d474c");
+    }
+    if (boot && scene === 4) {
+      const channel = ease(fraction);
+      const bearing = -Math.PI * .76;
+      arc(scale * 1.44, bearing, bearing + Math.PI * .52 * channel, "#af5258", 2);
+      for (let tick = 0; tick < 12 * channel; tick++) {
+        const angle = bearing + tick * .14;
+        const inner = scale * 1.39;
+        const outer = scale * (tick % 3 === 0 ? 1.49 : 1.46);
+        segment(Math.cos(angle) * inner, Math.sin(angle) * inner,
+          Math.cos(angle) * outer, Math.sin(angle) * outer, "#725055");
+      }
+    }
+    if (!mobile) {
+      const labelStart = scale * .58;
+      const labelEnd = Math.min(width - centerX - 15, scale * 1.20);
+      route([[labelStart, -scale * .64], [labelStart + 18, -scale * .76], [labelEnd, -scale * .76]], "#6d555a");
+      context.fillStyle = "#a5a2a9";
+      context.font = '10px ui-monospace, monospace';
+      context.textAlign = "right";
+      context.fillText("CORE / 07", labelEnd, -scale * .76 - 8);
+    }
+  }
+}
+
+function gate(boot, scene, fraction) {
+  const narrow = narrowScreen.matches;
+  const x = width * (narrow ? .87 : .78);
+  const y = height * (narrow ? .32 : .5);
+  const reach = Math.min(width * .28, 210);
+  context.translate(x, y);
+  route([[-reach, -102], [-reach + 15, -117], [reach - 15, -117], [reach, -102],
+    [reach, 102], [reach - 15, 117], [-reach + 15, 117], [-reach, 102], [-reach, -102]], "#322427");
+  segment(-width, -117, -reach + 15, -117, "#262629");
+  segment(-reach + 15, 117, width, 117, "#262629");
+  if (boot) {
+    const open = scene === 0 ? fraction * 2 : scene < 3 ? 1 : scene === 3 ? 1 - fraction : 0;
+    const left = -reach * Math.min(1, open);
+    const right = -left;
+    for (const edge of [left, right]) segment(edge, -100, edge, 100, "#7f393c");
+    for (let i = 0; i < 9; i++) {
+      const y = -77 + i * 19;
+      segment(-reach, y, left, y, "#39262a");
+      segment(right, y, reach, y, "#39262a");
+    }
+    if (scene === 2) {
+      const x = -reach + fraction * reach * 2;
+      segment(x, -98, x, 98, "#ef4444");
+    }
+    if (scene === 4) {
+      segment(-25, -25, 25, 25, "#9d3539");
+      segment(25, -25, -25, 25, "#9d3539");
+    }
+  }
+  for (let i = 0; i < 17; i++) {
+    segment(reach - 106 + i * 8, -116, reach - 90 + i * 8, -132, "#442529");
+  }
+}
+
+function elapsedSinceBoot(now) {
+  return Math.max(0, now - started - corePowerDuration - duration);
+}
+
+function updateBoot(elapsed) {
+  const scene = boundaries.findIndex(time => elapsed < time) - 1;
+  const percent = Math.floor(elapsed / duration * 100);
+  if (percent !== lastPercent) {
+    lastPercent = percent;
+    byId("percentage").textContent = `${String(percent).padStart(2, "0")}%`;
+    byId("progress").style.width = `${percent}%`;
+  }
+  if (scene !== lastStep) {
+    lastStep = scene;
+    const [title, detail, log] = concepts[current].boot[scene];
+    bootScene.dataset.scene = String(scene);
+    terminal.dataset.step = String(scene);
+    // Swapping animation names also restarts the entrance when replay interrupts it.
+    bootScene.style.animationName = scene % 2 ? "scene-in-alt" : "scene-in";
+    byId("boot-index").textContent = `SYSTEM INIT / 0${scene + 1}·05`;
+    byId("boot-title").textContent = title;
+    byId("boot-detail").textContent = detail;
+    byId("log-message").textContent = log;
+  }
+  return scene;
+}
+
+function pushCoreTrace(line) {
+  traceRows[0].textContent = traceRows[1].textContent;
+  traceRows[1].textContent = traceRows[2].textContent;
+  traceRows[2].textContent = line;
+}
+
+function updateCoreTrace(elapsed, boot, scene) {
+  if (boot && trace.scene !== scene) {
+    trace.scene = scene;
+    const [command, result] = coreBootTrace[scene];
+    pushCoreTrace(`> ${command}`);
+    trace.pending = result;
+    trace.next = elapsed + 470 + Math.random() * 320;
+    return;
+  }
+  if (elapsed < trace.next) return;
+
+  if (trace.pending) {
+    pushCoreTrace(`  ${trace.pending}`);
+    trace.pending = "";
+    trace.next = elapsed + 1350 + Math.random() * 1800;
+  } else if (!boot) {
+    const offset = 1 + Math.floor(Math.random() * (coreRuntimeTrace.length - 1));
+    trace.lastCheck = (trace.lastCheck + offset) % coreRuntimeTrace.length;
+    const [command, result] = coreRuntimeTrace[trace.lastCheck];
+    pushCoreTrace(`> ${command}`);
+    trace.pending = result;
+    trace.next = elapsed + 450 + Math.random() * 620;
+  }
+}
+
+function render(now) {
+  frame = 0;
+  const totalElapsed = Math.max(0, now - started);
+  if (terminal.dataset.phase === "power" && totalElapsed >= corePowerDuration) {
+    terminal.dataset.phase = "booting";
+    byId("link-state").textContent = "INITIALIZING";
+  }
+  const elapsed = Math.max(0, totalElapsed - (current === "b" ? corePowerDuration : 0));
+  if (terminal.dataset.phase === "booting" && elapsed >= duration) finishBoot();
+  const power = terminal.dataset.phase === "power";
+  const boot = terminal.dataset.phase === "booting";
+  const scene = power ? 0 : boot ? updateBoot(elapsed) : 4;
+  const fraction = power ? 0 : boot ? (elapsed - boundaries[scene]) / (boundaries[scene + 1] - boundaries[scene]) : 1;
+
+  if (current === "b" && !power && !reduceMotion.matches) updateCoreTrace(elapsed, boot, scene);
+
+  if (context && width && height) {
+    context.clearRect(0, 0, width, height);
+    context.save();
+    grid();
+    if (current === "a") command(boot, scene, fraction);
+    if (current === "b") core(power || boot, elapsed, now, scene, fraction);
+    if (current === "c") gate(boot, scene, fraction);
+    context.restore();
+  }
+  if (!reduceMotion.matches && (boot || current === "b")) redraw();
+}
+
+function redraw() {
+  if (!frame) frame = requestAnimationFrame(render);
+}
+
+function resize() {
+  if (!context) return;
+  const bounds = canvas.getBoundingClientRect();
+  width = bounds.width;
+  height = bounds.height;
+  const scale = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.round(width * scale);
+  canvas.height = Math.round(height * scale);
+  context.setTransform(scale, 0, 0, scale, 0, 0);
+  redraw();
+}
+
+function setConcept(letter) {
+  current = letter;
+  const concept = concepts[letter];
+  const index = "abc".indexOf(letter) + 1;
+  terminal.dataset.concept = letter;
+  byId("channel").textContent = `CH.0${index} / ${concept.channel}`;
+  byId("node").textContent = concept.node;
+  byId("mode").textContent = concept.mode;
+  byId("system-message").textContent = concept.state;
+  byId("code").textContent = concept.code;
+  byId("protocol").textContent = `PROTOCOL 0${index}`;
+  access.hidden = letter !== "c";
+  controls.forEach(button => button.setAttribute("aria-pressed", String(button.dataset.select === letter)));
+  playBoot();
+}
+
+function finishBoot() {
+  terminal.dataset.phase = "ready";
+  delete terminal.dataset.step;
+  byId("link-state").textContent = concepts[current].link;
+  byId("announcement").textContent = `${concepts[current].state}. Operator login available.`;
+}
+
+function playBoot() {
+  if (login.open) login.close();
+  camera.x = camera.y = camera.targetX = camera.targetY = 0;
+  started = performance.now();
+  lastStep = -1;
+  lastPercent = -1;
+  trace.scene = -1;
+  trace.next = 0;
+  trace.pending = "";
+  trace.lastCheck = -1;
+  traceRows.forEach(row => { row.textContent = ""; });
+  if (reduceMotion.matches) {
+    if (current === "b") {
+      pushCoreTrace("> corectl phase");
+      pushCoreTrace("  lock within tolerance");
+      pushCoreTrace("  operator port ready");
+    }
+    finishBoot();
+  } else {
+    byId("announcement").textContent = "Initializing terminal.";
+    if (current === "b") {
+      // Recreate the animation even when replay is pressed during power-on.
+      delete terminal.dataset.phase;
+      terminal.getBoundingClientRect();
+      terminal.dataset.phase = "power";
+      byId("link-state").textContent = "POWER ON";
+    } else {
+      terminal.dataset.phase = "booting";
+      byId("link-state").textContent = "INITIALIZING";
+      updateBoot(0);
+    }
+  }
+  redraw();
+}
+
+byId("login-open").addEventListener("click", () => {
+  byId("login-status").textContent = "AWAITING VERIFICATION";
+  byId("login-verify").disabled = false;
+  login.showModal();
+});
+byId("login-close").addEventListener("click", () => login.close());
+byId("login-verify").addEventListener("click", () => {
+  byId("login-status").textContent = current === "c" ? "DENIED / LEVEL 07 REQUIRED" : "OPERATOR VERIFIED / DEMO SESSION";
+  byId("login-verify").disabled = true;
+});
+
+reduceMotion.addEventListener("change", playBoot);
+new ResizeObserver(resize).observe(canvas);
+setConcept("b");
+  </script>
+</body>
+</html>
