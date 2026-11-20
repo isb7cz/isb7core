@@ -103,9 +103,8 @@
     a.module:hover, a.module:focus-visible { background: #171012; border-color: #8c4146; }
     a:focus-visible { outline: 1px solid var(--red); outline-offset: 3px; }
     .module-name { display: block; font-size: clamp(17px, 2.5vw, 23px); font-weight: 650; line-height: 1.2; }
-    .module-info, .module-state { color: var(--muted); font: 11px/1.45 var(--mono); }
+    .module-info { color: var(--muted); font: 11px/1.45 var(--mono); }
     .module-info { display: block; margin-top: 6px; }
-    .module-state { text-align: right; }
     .module-arrow {
       position: relative;
       flex: 0 0 10px;
@@ -144,10 +143,10 @@
       <nav aria-label="Moduly ISB7">
         <ul class="modules">
           <li>
-            <div class="module">
+            <a class="module" href="https://isb7notes.vercel.app/">
               <span><span class="module-name">ISB7notes</span><span class="module-info">Poznámky a úkoly</span></span>
-              <span class="module-state">Odkaz nenastaven</span>
-            </div>
+              <span class="module-arrow" aria-hidden="true"></span>
+            </a>
           </li>
           <li>
             <a class="module" href="https://isb7-garmin.trustworthybuckle16.chatgpt.site/">

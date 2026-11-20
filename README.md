@@ -3,7 +3,7 @@
 Statický web pro Cloudflare Pages. Použij kořen repozitáře jako výstupní adresář a nech příkaz sestavení prázdný. Lokálně stačí spustit `python3 -m http.server 8765` a otevřít `http://localhost:8765/`.
 
 - `/` je veřejná landing page. Odkaz **Operator login** vede přímo na `/portal/`.
-- `/portal/` je rozcestník bez vlastní autentizace. Odkaz pro ISB7notes je zatím nenastavený.
+- `/portal/` je rozcestník bez vlastní autentizace.
 
 ## Cloudflare Access
 
